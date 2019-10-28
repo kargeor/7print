@@ -5,6 +5,8 @@
 #include <errno.h>
 #include <unistd.h>
 #include <assert.h>
+#include <fcntl.h>
+#include <termios.h>
 
 #include <arpa/inet.h>
 
@@ -16,6 +18,9 @@
 
 #define PROTO_VERSION 1
 
+#define PORT 7770
+#define MAX_CLIENTS 20
+
 //
 typedef uint8_t FILENAME[64];
 
@@ -25,9 +30,11 @@ typedef struct {
 } TEMPERATURE; // 4 bytes
 
 typedef enum {
-  IDLE     = 1,
-  PRINTING = 2,
-  ERROR    = 3
+  SERVER_IDLE     = 1, // no serial connection
+  SERVER_READY    = 2, // ready for command
+  SERVER_BUSY     = 3,
+  SERVER_PRINTING = 4,
+  SERVER_ERROR    = 5
 } SERVER_STATE_ENUM;
 
 typedef struct {
@@ -49,10 +56,10 @@ typedef struct {
 } SERVER_STATE;
 //
 typedef enum {
-  PRINT_FILE   = 1,
-  RUN_GCODE    = 2,
-  PAUSE_PRINT  = 3,
-  CANCEL_PRINT = 4
+  CMD_PRINT_FILE   = 1,
+  CMD_RUN_GCODE    = 2,
+  CMD_PAUSE_PRINT  = 3,
+  CMD_CANCEL_PRINT = 4
 } COMMAND_ENUM;
 
 typedef union {
@@ -81,12 +88,8 @@ COMMAND cmd;
 uint8_t serverStateBuffer[sizeof(SERVER_STATE)];
 uint32_t serverStateBufferPos = 0;
 
-uint8_t cmdBuffer[sizeof(COMMAND)];
-uint32_t cmdBufferPos = 0;
-
-#define PORT 7770
-#define BUF_SIZE 2048
-#define MAX_CLIENTS 20
+uint8_t cmdBuffer[MAX_CLIENTS][sizeof(COMMAND)];
+uint32_t cmdBufferPos[MAX_CLIENTS];
 
 #define TRY(CMD, ERR) { if((CMD) == -1) { perror(ERR); exit(1); } }
 
@@ -134,6 +137,16 @@ static uint8_t readToBuffer(int fd, uint8_t *buf, uint32_t *bufPos, uint32_t siz
   return 0;
 }
 
+static uint8_t validateCommand(COMMAND *c) {
+  if (c->magic[0] != '7') return 0;
+  if (c->magic[0] != 'P') return 0;
+  if (c->magic[0] != 'R') return 0;
+  if (c->magic[0] != 'N') return 0;
+  if (c->version != PROTO_VERSION) return 0;
+
+  return 1;
+}
+
 void tcpService(int pipeRead, int pipeWrite) {
   int opt = 1;
   int listenSocket,
@@ -142,12 +155,9 @@ void tcpService(int pipeRead, int pipeWrite) {
       clientSocket[MAX_CLIENTS],
       activity,
       i,
-      valread,
       sd;
   int max_sd;
   struct sockaddr_in address;
-
-  char buffer[BUF_SIZE];
   fd_set readfds;
 
   for (i = 0; i < MAX_CLIENTS; i++) {
@@ -189,29 +199,40 @@ void tcpService(int pipeRead, int pipeWrite) {
     if (FD_ISSET(listenSocket, &readfds)) {
       TRY(newSocket = accept(listenSocket, (struct sockaddr *)&address, (socklen_t*)&addrlen), "accept");
 
-      printf("** New connection [%d] %s:%d\n", newSocket, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
+      printf("New [%d] %s:%d\n", newSocket, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 
       writeX(newSocket, &serverState, sizeof(SERVER_STATE));
 
       for (i = 0; i < MAX_CLIENTS; i++) {
         if(clientSocket[i] == 0) {
           clientSocket[i] = newSocket;
+          cmdBufferPos[i] = 0;
           break;
         }
       }
+      // TODO: Close/Report if not available place in clientSocket[]
     }
 
     for (i = 0; i < MAX_CLIENTS; i++) {
       sd = clientSocket[i];
 
-      if (FD_ISSET(sd , &readfds)) {
-        if ((valread = readX(sd, buffer, 1024)) == 0) {
+      if (FD_ISSET(sd, &readfds)) {
+        uint8_t res = readToBuffer(sd, cmdBuffer[i], &(cmdBufferPos[i]), sizeof(COMMAND));
+        if (res == 1) {
           // disconnect
           printf("Disconnected [%d]\n", sd);
           close(sd);
           clientSocket[i] = 0;
-        } else {
-          ///writeX(sd, buffer, valread);
+        } else if (res == 2) {
+          // client sent command
+          printf("Command from [%d]\n", sd);
+          if (validateCommand((COMMAND*)cmdBuffer[i])) {
+            // write to pipe
+            writeX(pipeWrite, cmdBuffer[i], sizeof(COMMAND));
+            printf("Command Sent\n");
+          } else {
+            // handle invalid
+          }
         }
       }
     }
@@ -233,6 +254,46 @@ void tcpService(int pipeRead, int pipeWrite) {
   exit(1);
 }
 
+//
+
+// TODO: Read portname+baudSpeed from config file
+static char *portname = "/dev/ttyACM0";
+static int baudSpeed = 115200;
+static int serialFd = 0;
+
+static void openSerial(void) {
+  TRY(serialFd = open(portname, O_RDWR | O_NOCTTY | O_SYNC), "serial open");
+
+  struct termios tty;
+  memset(&tty, 0, sizeof(tty));
+  TRY(tcgetattr(serialFd, &tty), "tcgetattr");
+
+  TRY(cfsetospeed(&tty, baudSpeed), "cfsetospeed");
+  TRY(cfsetispeed(&tty, baudSpeed), "cfsetispeed");
+
+  // 8-bit
+  tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;
+  // // disable break processing
+  tty.c_iflag &= ~IGNBRK;
+  tty.c_lflag = 0;
+  tty.c_oflag = 0;
+  // MIN == 0, TIME == 0 (polling read)
+  tty.c_cc[VMIN]  = 0;
+  tty.c_cc[VTIME] = 0;
+  // no xon/xoff
+  tty.c_iflag &= ~(IXON | IXOFF | IXANY);
+  // Ignore modem, Enable receiver
+  tty.c_cflag |= (CLOCAL | CREAD);
+  // no parity
+  tty.c_cflag &= ~(PARENB | PARODD);
+  // no stop bits
+  tty.c_cflag &= ~CSTOPB;
+  // no flow control
+  tty.c_cflag &= ~CRTSCTS;
+
+  TRY(tcsetattr(serialFd, TCSANOW, &tty), "tcsetattr");
+}
+
 void setHighPriority(void) {
   // TODO: Set process priority and io to highest
   /// http://man7.org/linux/man-pages/man2/ioprio_set.2.html
@@ -249,12 +310,19 @@ void sendState(int pipeWrite) {
 
 void serialService(int pipeRead, int pipeWrite) {
   setHighPriority();
+  openSerial();
+
   while (1) {
     sendState(pipeWrite);
     serverState.state++;
+
+    writeX(serialFd, "M117 TEST\n", 10);
+
     sleep(2);
   }
 }
+
+//
 
 #define PIPE_READ 0
 #define PIPE_WRITE 1
