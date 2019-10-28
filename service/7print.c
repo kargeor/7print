@@ -13,6 +13,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 
 #include <netinet/in.h>
 
@@ -256,9 +257,32 @@ void tcpService(int pipeRead, int pipeWrite) {
 
 //
 
+/*
+  B0
+  B50
+  B75
+  B110
+  B134
+  B150
+  B200
+  B300
+  B600
+  B1200
+  B1800
+  B2400
+  B4800
+  B9600
+  B19200
+  B38400
+  B57600
+  B115200
+  B230400
+  // https://code.woboq.org/userspace/glibc/bits/termios.h.html
+*/
+
 // TODO: Read portname+baudSpeed from config file
 static char *portname = "/dev/ttyACM0";
-static int baudSpeed = 115200;
+static int baudSpeed = B115200;
 static int serialFd = 0;
 
 static void openSerial(void) {
