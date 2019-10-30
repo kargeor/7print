@@ -89,3 +89,28 @@ void serialService(int pipeRead, int pipeWrite) {
     sleep(2);
   }
 }
+
+void serialTestSendGcode(FILE *gcodeDebugFile) {
+  char line[1024];
+  openSerial();
+
+  while(fgets(line, 1024, gcodeDebugFile)) {
+    // find size
+    int lineSize = 0;
+    while (line[lineSize] != '\0' &&
+           line[lineSize] != '\n' &&
+           line[lineSize] != '\r' &&
+           lineSize < (1024 - 1)) lineSize++;
+
+    line[lineSize] = '\0';
+    printf("[%s]\n", line);
+
+    line[lineSize] = '\n';
+    writeX(serialFd, line, lineSize + 1);
+
+    // serial read response line
+    lineSize = readX(serialFd, line, 1024);
+    line[lineSize + 1] = '\0';
+    printf("READ %d {%s}\n", lineSize, line);
+  }
+}

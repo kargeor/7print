@@ -8,6 +8,31 @@ int main(int argc, char *argv[]) {
   int serial_to_tcp[2];
   int tcp_to_serial[2];
 
+  int c;
+  FILE *gcodeDebugFile = NULL;
+  int sendGcodeDebug = 0;
+
+  while ((c = getopt(argc, argv, "s:")) != -1) {
+    switch(c) {
+      case 's':
+        // send .gcode to serial
+        sendGcodeDebug = 1;
+        gcodeDebugFile = fopen(optarg, "r");
+        break;
+
+      default:
+        printf("ERROR: Command line args\n");
+        exit(1);
+    }
+  }
+
+  if (sendGcodeDebug) {
+    printf("Send Gcode Debug mode:");
+    serialTestSendGcode(gcodeDebugFile);
+    fclose(gcodeDebugFile);
+    exit(1);
+  }
+
   TRY(pipe(tcp_to_serial), "pipe");
   TRY(pipe(serial_to_tcp), "pipe");
 

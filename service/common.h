@@ -97,6 +97,7 @@ uint8_t readToBuffer(int fd, uint8_t *buf, uint32_t *bufPos, uint32_t size);
 
 void serialService(int pipeRead, int pipeWrite);
 void tcpService(int pipeRead, int pipeWrite);
+void serialTestSendGcode(FILE *gcodeDebugFile);
 
 
 extern SERVER_STATE serverState;
