@@ -145,10 +145,17 @@ void serialTestSendGcode(FILE *gcodeDebugFile) {
     if (FD_ISSET(serialFd, &readfds)) {
       responsePos += readX(serialFd, &(response[responsePos]), 1024 - responsePos);
       printf("responsePos = %d\n", responsePos);
+
       for (int i = 0; i < responsePos; i++) {
-        printf("%d", response[i]);
+        if (response[i] == '\n') {
+          // line found response[0..i]
+          response[i] = '\0';
+          printf("{%s}\n", response);
+          currentQueueCommands--;
+          memmove(response, &(response[i+1]), 1024 - (i + 1));
+          break;
+        }
       }
-      printf("\n\n");
     }
   }
 }
