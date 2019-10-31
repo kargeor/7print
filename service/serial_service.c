@@ -29,6 +29,20 @@ static char *portname = "/dev/ttyACM0";
 static int baudSpeed = B115200;
 static int serialFd = 0;
 
+// Queue management
+static int maxQueueCommands = 3;
+static int currentQueueCommands = 0;
+
+// return true if we should queue the command
+static int commandForQueue(void) {
+  return true;
+}
+
+// removes comments and trailing spaces
+static void trimCommand(void) {
+  //
+}
+
 static void openSerial(void) {
   TRY(serialFd = open(portname, O_RDWR | O_NOCTTY | O_SYNC), "serial open");
 
@@ -92,25 +106,43 @@ void serialService(int pipeRead, int pipeWrite) {
 
 void serialTestSendGcode(FILE *gcodeDebugFile) {
   char line[1024];
+  char response[1024];
+  int responsePos = 0;
   openSerial();
 
-  while(fgets(line, 1024, gcodeDebugFile)) {
-    // find size
-    int lineSize = 0;
-    while (line[lineSize] != '\0' &&
-           line[lineSize] != '\n' &&
-           line[lineSize] != '\r' &&
-           lineSize < (1024 - 1)) lineSize++;
+  fd_set readfds;
+  FD_ZERO(&readfds);
 
-    line[lineSize] = '\0';
-    printf("[%s]\n", line);
+  while(1) {
 
-    line[lineSize] = '\n';
-    writeX(serialFd, line, lineSize + 1);
+    if (currentQueueCommands < maxQueueCommands) {
+
+      if (fgets(line, 1024, gcodeDebugFile) == NULL) {
+        return; // END OF FILE
+        // TODO: Handle remaining acks
+      }
+
+      // find size
+      int lineSize = 0;
+      while (line[lineSize] != '\0' &&
+             line[lineSize] != '\n' &&
+             line[lineSize] != '\r' &&
+             lineSize < (1024 - 1)) lineSize++;
+
+      line[lineSize] = '\0';
+      printf("[%s]\n", line);
+
+      line[lineSize] = '\n';
+      writeX(serialFd, line, lineSize + 1);
+    }
 
     // serial read response line
-    lineSize = readX(serialFd, line, 1024);
-    line[lineSize + 1] = '\0';
-    printf("READ %d {%s}\n", lineSize, line);
+    FD_SET(serialFd, &readfds);
+    select(serialFd + 1, &readfds, NULL, NULL, NULL);
+
+    if (FD_ISSET(serialFd, &readfds)) {
+      responsePos += readX(serialFd, &(response[responsePos]), 1024 - responsePos);
+      printf("responsePos = %d\n", responsePos);
+    }
   }
 }
