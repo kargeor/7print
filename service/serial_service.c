@@ -131,7 +131,7 @@ void serialTestSendGcode(FILE *gcodeDebugFile) {
              lineSize < (1024 - 1)) lineSize++;
 
       line[lineSize] = '\0';
-      printf("[%s]\n", line);
+      printf("[%s] %d\n", line, currentQueueCommands);
 
       line[lineSize] = '\n';
       writeX(serialFd, line, lineSize + 1);
@@ -153,6 +153,7 @@ void serialTestSendGcode(FILE *gcodeDebugFile) {
           printf("{%s}\n", response);
           currentQueueCommands--;
           memmove(response, &(response[i+1]), 1024 - (i + 1));
+          responsePos = 0;
           break;
         }
       }
