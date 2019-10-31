@@ -35,7 +35,7 @@ static int currentQueueCommands = 0;
 
 // return true if we should queue the command
 static int commandForQueue(void) {
-  return true;
+  return 1;
 }
 
 // removes comments and trailing spaces
@@ -45,6 +45,7 @@ static void trimCommand(void) {
 
 static void openSerial(void) {
   TRY(serialFd = open(portname, O_RDWR | O_NOCTTY | O_SYNC), "serial open");
+  return; // TODO: fix this later...
 
   struct termios tty;
   memset(&tty, 0, sizeof(tty));
@@ -134,6 +135,7 @@ void serialTestSendGcode(FILE *gcodeDebugFile) {
 
       line[lineSize] = '\n';
       writeX(serialFd, line, lineSize + 1);
+      currentQueueCommands++;
     }
 
     // serial read response line
@@ -143,6 +145,10 @@ void serialTestSendGcode(FILE *gcodeDebugFile) {
     if (FD_ISSET(serialFd, &readfds)) {
       responsePos += readX(serialFd, &(response[responsePos]), 1024 - responsePos);
       printf("responsePos = %d\n", responsePos);
+      for (int i = 0; i < responsePos; i++) {
+        printf("%d", response[i]);
+      }
+      printf("\n\n");
     }
   }
 }
