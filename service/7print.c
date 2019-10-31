@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (sendGcodeDebug) {
-    printf("Send Gcode Debug mode:");
+    printf("Send Gcode Debug mode:\n");
     serialTestSendGcode(gcodeDebugFile);
     fclose(gcodeDebugFile);
     exit(1);

@@ -146,7 +146,9 @@ void serialTestSendGcode(FILE *gcodeDebugFile) {
       responsePos += readX(serialFd, &(response[responsePos]), 1024 - responsePos);
       printf("responsePos = %d\n", responsePos);
 
+      // TODO: rerun this until all lines are accepted
       for (int i = 0; i < responsePos; i++) {
+        if (response[i] == '\r') response[i] = '+';
         if (response[i] == '\n') {
           // line found response[0..i]
           response[i] = '\0';
