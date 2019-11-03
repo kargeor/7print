@@ -38,7 +38,8 @@ static void openSerial(void) {
   TRY(serialFd = open(portname, O_RDWR | O_NOCTTY | O_SYNC), "serial open");
 
   if (args.dontSetSerialConfig) {
-    printf("args.dontSetSerialConfig is set\n");
+    printf_w("Dont-Set-Serial-Config is set\n");
+    return;
   }
 
   struct termios tty;
@@ -69,6 +70,10 @@ static void openSerial(void) {
   tty.c_cflag &= ~CRTSCTS;
 
   TRY(tcsetattr(serialFd, TCSANOW, &tty), "tcsetattr");
+
+  // Wait for printer to be ready
+  // TODO: Find better way
+  sleep(5);
 }
 
 static void setHighPriority(void) {
@@ -110,11 +115,13 @@ static int responseBufferPos = 0;
 // Queue management
 static int maxQueueCommands = 4;
 static int currentQueueCommands = 0;
+static int waitQueueEmpty = 0;
 
-// return true if we should queue the command
-// static int commandForQueue(void) {
-//   return 1;
-// }
+// return true if we should wait and not add more commands
+static int isWaitCommand(void) {
+  return strncmp(gCodeLine, "M109", 4) == 0
+      || strncmp(gCodeLine, "M190", 4) == 0;
+}
 
 // removes comments and trailing spaces, return size
 static int trimGCodeLine(void) {
@@ -149,6 +156,8 @@ static void processResponseLine(void) {
   if (currentQueueCommands > 0) {
     currentQueueCommands--;
   }
+
+  printf_d("Response = [%s] Queue = %d/%d\n", responseLine, currentQueueCommands, maxQueueCommands);
 }
 
 static int processResponseBuffer(void) {
@@ -186,14 +195,24 @@ void serialTestSendGcode(void) {
   while(1) {
 
     int lineSize = 0;
-    if ((currentQueueCommands < maxQueueCommands) && readNextGCodeLine() && (lineSize = trimGCodeLine())) {
+    waitQueueEmpty = waitQueueEmpty && (currentQueueCommands > 0);
+
+    if (!waitQueueEmpty
+        && (currentQueueCommands < maxQueueCommands)
+        && readNextGCodeLine()
+        && (lineSize = trimGCodeLine())) {
 
       gCodeLine[lineSize] = '\n';
       writeX(serialFd, gCodeLine, lineSize + 1);
       currentQueueCommands++;
 
       gCodeLine[lineSize] = '\0';
-      printf("G-Code = [%s] Queue Size = %d\n", gCodeLine, currentQueueCommands);
+      printf_d("G-Code = [%s] Queue = %d/%d\n", gCodeLine, currentQueueCommands, maxQueueCommands);
+
+      if (isWaitCommand()) {
+        printf_d("Wait for Queue to clear\n");
+        waitQueueEmpty = 1;
+      }
     }
 
     // serial read response line
