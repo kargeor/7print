@@ -97,11 +97,22 @@ uint8_t readToBuffer(int fd, uint8_t *buf, uint32_t *bufPos, uint32_t size);
 
 void serialService(int pipeRead, int pipeWrite);
 void tcpService(int pipeRead, int pipeWrite);
-void serialTestSendGcode(FILE *gcodeDebugFile);
+void serialTestSendGcode(void);
 
 
 extern SERVER_STATE serverState;
 extern COMMAND cmd;
 
+
+typedef struct {
+  FILE *gcodeDebugFile;
+  int sendGcodeDebug;
+
+  int dontSetSerialConfig;
+  int serialPortOverride;
+  char *serialPort;
+} CMD_ARGS;
+
+extern CMD_ARGS args;
 
 #endif

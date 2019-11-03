@@ -9,15 +9,22 @@ int main(int argc, char *argv[]) {
   int tcp_to_serial[2];
 
   int c;
-  FILE *gcodeDebugFile = NULL;
-  int sendGcodeDebug = 0;
-
-  while ((c = getopt(argc, argv, "s:")) != -1) {
+  memset(&args, 0, sizeof(CMD_ARGS));
+  while ((c = getopt(argc, argv, "s:np:")) != -1) {
     switch(c) {
       case 's':
         // send .gcode to serial
-        sendGcodeDebug = 1;
-        gcodeDebugFile = fopen(optarg, "r");
+        args.sendGcodeDebug = 1;
+        args.gcodeDebugFile = fopen(optarg, "r");
+        break;
+
+      case 'n':
+        args.dontSetSerialConfig = 1;
+        break;
+
+      case 'p':
+        args.serialPortOverride = 1;
+        args.serialPort = optarg;
         break;
 
       default:
@@ -26,11 +33,13 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (sendGcodeDebug) {
+  if (args.sendGcodeDebug) {
     printf("Send Gcode Debug mode:\n");
-    serialTestSendGcode(gcodeDebugFile);
-    fclose(gcodeDebugFile);
-    exit(1);
+
+    serialTestSendGcode();
+    fclose(args.gcodeDebugFile);
+
+    exit(0);
   }
 
   TRY(pipe(tcp_to_serial), "pipe");

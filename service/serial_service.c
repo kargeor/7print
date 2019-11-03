@@ -29,23 +29,17 @@ static char *portname = "/dev/ttyACM0";
 static int baudSpeed = B115200;
 static int serialFd = 0;
 
-// Queue management
-static int maxQueueCommands = 3;
-static int currentQueueCommands = 0;
-
-// return true if we should queue the command
-static int commandForQueue(void) {
-  return 1;
-}
-
-// removes comments and trailing spaces
-static void trimCommand(void) {
-  //
-}
-
 static void openSerial(void) {
+  if (args.serialPortOverride) {
+    portname = args.serialPort;
+    // TODO: read from config
+  }
+
   TRY(serialFd = open(portname, O_RDWR | O_NOCTTY | O_SYNC), "serial open");
-  return; // TODO: fix this later...
+
+  if (args.dontSetSerialConfig) {
+    printf("args.dontSetSerialConfig is set\n");
+  }
 
   struct termios tty;
   memset(&tty, 0, sizeof(tty));
@@ -105,10 +99,85 @@ void serialService(int pipeRead, int pipeWrite) {
   }
 }
 
-void serialTestSendGcode(FILE *gcodeDebugFile) {
-  char line[1024];
-  char response[1024];
-  int responsePos = 0;
+// gCode Handling
+
+#define G_CODE_BUF_SIZE 1024
+static char gCodeLine[G_CODE_BUF_SIZE];
+static char responseBuffer[G_CODE_BUF_SIZE];
+static char responseLine[G_CODE_BUF_SIZE];
+static int responseBufferPos = 0;
+
+// Queue management
+static int maxQueueCommands = 4;
+static int currentQueueCommands = 0;
+
+// return true if we should queue the command
+// static int commandForQueue(void) {
+//   return 1;
+// }
+
+// removes comments and trailing spaces, return size
+static int trimGCodeLine(void) {
+  int i = 0;
+  while (gCodeLine[i] != '\0' &&
+         gCodeLine[i] != '\n' &&
+         gCodeLine[i] != '\r' &&
+         gCodeLine[i] != ';' &&
+         i < (G_CODE_BUF_SIZE - 1)) i++;
+
+  // trim to EOL or comment start
+  // remove spaces and tabs
+  do {
+    gCodeLine[i] = '\0';
+    i--;
+  } while (i > 0 && (gCodeLine[i] == ' ' || gCodeLine[i] == '\t'));
+
+  return i + 1;
+}
+
+// return true if we have next command
+static int readNextGCodeLine(void) {
+  if (fgets(gCodeLine, G_CODE_BUF_SIZE, args.gcodeDebugFile) == NULL) {
+    // EOF
+    return 0;
+  }
+
+  return 1;
+}
+
+static void processResponseLine(void) {
+  if (currentQueueCommands > 0) {
+    currentQueueCommands--;
+  }
+}
+
+static int processResponseBuffer(void) {
+  for (int i = 0; i < responseBufferPos; i++) {
+
+    if (responseBuffer[i] == '\r') {
+      // to help with debug logs
+      responseBuffer[i] = '+';
+    } else if (responseBuffer[i] == '\n') {
+      responseBuffer[i] = '\0';
+      memcpy(responseLine, responseBuffer, i + 1);
+      processResponseLine();
+
+      for (int j = i; j < G_CODE_BUF_SIZE - 1; j++) {
+        responseBuffer[j - i] = responseBuffer[j + 1];
+      }
+
+      responseBufferPos -= i + 1;
+      return 1;
+    }
+
+  }
+
+  // no more lines
+  return 0;
+}
+
+void serialTestSendGcode(void) {
+  struct timeval timeout = {0, 1000};
   openSerial();
 
   fd_set readfds;
@@ -116,49 +185,24 @@ void serialTestSendGcode(FILE *gcodeDebugFile) {
 
   while(1) {
 
-    if (currentQueueCommands < maxQueueCommands) {
+    int lineSize = 0;
+    if ((currentQueueCommands < maxQueueCommands) && readNextGCodeLine() && (lineSize = trimGCodeLine())) {
 
-      if (fgets(line, 1024, gcodeDebugFile) == NULL) {
-        return; // END OF FILE
-        // TODO: Handle remaining acks
-      }
-
-      // find size
-      int lineSize = 0;
-      while (line[lineSize] != '\0' &&
-             line[lineSize] != '\n' &&
-             line[lineSize] != '\r' &&
-             lineSize < (1024 - 1)) lineSize++;
-
-      line[lineSize] = '\0';
-      printf("[%s] %d\n", line, currentQueueCommands);
-
-      line[lineSize] = '\n';
-      writeX(serialFd, line, lineSize + 1);
+      gCodeLine[lineSize] = '\n';
+      writeX(serialFd, gCodeLine, lineSize + 1);
       currentQueueCommands++;
+
+      gCodeLine[lineSize] = '\0';
+      printf("G-Code = [%s] Queue Size = %d\n", gCodeLine, currentQueueCommands);
     }
 
     // serial read response line
     FD_SET(serialFd, &readfds);
-    select(serialFd + 1, &readfds, NULL, NULL, NULL);
+    select(serialFd + 1, &readfds, NULL, NULL, &timeout);
 
     if (FD_ISSET(serialFd, &readfds)) {
-      responsePos += readX(serialFd, &(response[responsePos]), 1024 - responsePos);
-      printf("responsePos = %d\n", responsePos);
-
-      // TODO: rerun this until all lines are accepted
-      for (int i = 0; i < responsePos; i++) {
-        if (response[i] == '\r') response[i] = '+';
-        if (response[i] == '\n') {
-          // line found response[0..i]
-          response[i] = '\0';
-          printf("{%s}\n", response);
-          currentQueueCommands--;
-          memmove(response, &(response[i+1]), 1024 - (i + 1));
-          responsePos = 0;
-          break;
-        }
-      }
+      responseBufferPos += readX(serialFd, &(responseBuffer[responseBufferPos]), G_CODE_BUF_SIZE - responseBufferPos);
+      while(processResponseBuffer());
     }
   }
 }
