@@ -73,7 +73,7 @@ static void openSerial(void) {
 
   // Wait for printer to be ready
   // TODO: Find better way
-  sleep(5);
+  sleep(1);
 }
 
 static void setHighPriority(void) {
@@ -153,8 +153,12 @@ static int readNextGCodeLine(void) {
 }
 
 static void processResponseLine(void) {
-  if (currentQueueCommands > 0) {
-    currentQueueCommands--;
+  if (responseLine[0] == 'o' && responseLine[1] == 'k') {
+    if (currentQueueCommands > 0) {
+      currentQueueCommands--;
+    }
+  } else {
+    // TODO: handle other messages
   }
 
   printf_d("Response = [%s] Queue = %d/%d\n", responseLine, currentQueueCommands, maxQueueCommands);
