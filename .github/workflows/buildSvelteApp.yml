@@ -24,6 +24,6 @@ jobs:
     - name: Yarn Bootstrap
       uses: Borales/actions-yarn@v2.0.0
       with:
-        cmd: build --cwd webUI
+        cmd: run build --cwd webUI
       env:
         CI: true
