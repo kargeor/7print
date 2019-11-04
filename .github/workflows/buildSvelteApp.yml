@@ -20,10 +20,10 @@ jobs:
     - name: Yarn Install
       uses: Borales/actions-yarn@v2.0.0
       with:
-        cmd: install --cwd webUI
-    - name: Yarn Bootstrap
+        cmd: --cwd webUI install
+    - name: Yarn Build
       uses: Borales/actions-yarn@v2.0.0
       with:
-        cmd: run build --cwd webUI
+        cmd: run --cwd webUI build
       env:
         CI: true
