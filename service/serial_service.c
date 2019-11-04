@@ -113,14 +113,20 @@ static char responseLine[G_CODE_BUF_SIZE];
 static int responseBufferPos = 0;
 
 // Queue management
+// Size = 4 works well
+// RX_BUFFER_SIZE=128 on printer side
+// TODO: experiment with other sizes
 static int maxQueueCommands = 4;
 static int currentQueueCommands = 0;
 static int waitQueueEmpty = 0;
 
 // return true if we should wait and not add more commands
 static int isWaitCommand(void) {
-  return strncmp(gCodeLine, "M109", 4) == 0
-      || strncmp(gCodeLine, "M190", 4) == 0;
+  return strncmp(gCodeLine, "M109", 4) == 0   // wait for hotend temp
+      || strncmp(gCodeLine, "M190", 4) == 0   // wait for bed temp
+      || strncmp(gCodeLine, "G28", 3) == 0    // auto-home
+      || strncmp(gCodeLine, "G29", 3) == 0    // bed level
+      || strncmp(gCodeLine, "G80", 3) == 0;   // mesh bed leveling (non-standard?)
 }
 
 // removes comments and trailing spaces, return size
