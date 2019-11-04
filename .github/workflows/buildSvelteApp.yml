@@ -24,6 +24,6 @@ jobs:
     - name: Yarn Build
       uses: Borales/actions-yarn@v2.0.0
       with:
-        cmd: run --cwd webUI build
+        cmd: --cwd webUI build
       env:
         CI: true
