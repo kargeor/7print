@@ -1,0 +1,15 @@
+name: Build C service
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v1
+    - name: cd
+      run: cd service
+    - name: make
+      run: make
