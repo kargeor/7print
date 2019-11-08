@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+cat <<EOF
+{
+  "api": "1.0",
+  "server": "1.0.0",
+  "text": "OctoPrint-api-compatible 7Print"
+}
+EOF
+

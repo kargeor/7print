@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+if [ "$REQUEST_METHOD" = "POST" ]; then
+  if [ "$CONTENT_LENGTH" -gt 0 ]; then
+    FN=`echo "$PATH_INFO" | sed 's/^\///' | sed 's/[^A-Za-z0-9\.]/_/g'`
+    echo "$PATH_INFO" >/home/pi/uploads/pi.txt
+    cat | sed '1,/Content-Type:/d' | tail -c +3 | head --lines=-1 | head --bytes=-4 >"/home/pi/uploads/$FN"
+  fi
+fi
+
+echo "OK"
+
