@@ -1,17 +1,7 @@
 <script>
+  import {fileSize} from './utils';
   export let name = '';
   export let stat = {};
-
-  function fileSize(sz) {
-    const units = ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'];
-    let i = 0;
-    while (sz > 1000) {
-      sz = sz / 1000;
-      i++;
-    }
-
-    return `${sz.toFixed(2)}${units[i]}B`;
-  }
 </script>
 <style>
   button {

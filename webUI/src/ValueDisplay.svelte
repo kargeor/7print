@@ -11,6 +11,9 @@
   .name {
     color: red;
   }
+  .value {
+    font-family: Courier, monospace;
+  }
 </style>
 
 <div>

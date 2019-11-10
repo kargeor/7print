@@ -3,20 +3,76 @@
   import ValueDisplay from './ValueDisplay.svelte';
   import Button from './Button.svelte';
   import UploadedFile from './UploadedFile.svelte';
+  import {formatTime, calcPercent, u} from './utils';
 
   let serverFiles = [];
   fetch('api-7print/listFiles').then(r => r.json()).then(json => (serverFiles = json));
   // TODO: sort serverFiles by time
 
-  const ws = new WebSocket('ws://7print.local:7777/socket', 'binary');
+  let serverState = {};
+  const ws = new WebSocket(`ws://${location.host}/socket`, 'binary');
   ws.binaryType = 'arraybuffer';
-  const messageSize = 100;
+  //
+  const messageSize = 108;
+  const FIELDS = [
+    ['magic0',       8],
+    ['magic1',       8],
+    ['magic2',       8],
+    ['magic3',       8],
+    ['version',     16],
+    ['reserved',    16],
+    ['bedTarget',   16],
+    ['bedCurrent',  16],
+    ['extrTarget',  16],
+    ['extrCurrent', 16],
+    ['currentFile', 's', 64],
+    ['bytesSent',   32],
+    ['bytesRemain', 32],
+    ['zposSent',    32],
+    ['zposRemain',  32],
+    ['timeSpent',   32],
+    ['timeRemain',  32],
+    ['state',       32],
+  ];
+  function decodeMessage(dv) {
+    const result = {};
+    let offset = 0;
+    FIELDS.forEach(f => {
+      if (f[1] === 8) {
+        result[f[0]] = dv.getUint8(offset, true);
+        offset += 1;
+      } else if (f[1] === 16) {
+        result[f[0]] = dv.getUint16(offset, true);
+        offset += 2;
+      } else if (f[1] === 32) {
+        result[f[0]] = dv.getUint32(offset, true);
+        offset += 4;
+      } else if (f[1] === 's') {
+        // TODO
+        offset += f[2];
+      } else {
+        console.log("Cannot decode " + f);
+      }
+    });
+    return result;
+  }
+  //
+  const SERVER_STATES = [
+    '',
+    'NO SERIAL',
+    'READY',
+    'BUSY',
+    'PRINTING',
+    'PAUSED',
+    'ERROR',
+  ];
+  //
   ws.onmessage = ({data}) => {
     if (data.byteLength !== messageSize) {
       console.error('Data size is wrong');
     } else {
-      const v = new DataView(data);
-      console.log(v.getUint32(96, true));
+      const dv = new DataView(data);
+      serverState = decodeMessage(dv);
     }
   };
 </script>
@@ -37,11 +93,11 @@
 </style>
 
 <section>
-  <h1>7print</h1>
-  <ValueDisplay name="Status" value="Printing" />
-  <ValueDisplay name="Progress" value="50%" />
-  <ValueDisplay name="Print Time" value="0:00:00" />
-  <ValueDisplay name="Remaining Time" value="0:00:00" />
+  <h1>7print (alpha version)</h1>
+  <ValueDisplay name="Status" value={u(SERVER_STATES[serverState['state']])} />
+  <ValueDisplay name="Progress" value={calcPercent(serverState)} />
+  <ValueDisplay name="Print Time" value={formatTime(serverState['timeSpent'])} />
+  <ValueDisplay name="Remaining Time" value={formatTime(serverState['timeRemain'])} />
   <ValueDisplay name="Z Position" value="12.30mm" />
 
   <TempDisplay name="Hotend" valueCurrent=20 valueSet=200 />

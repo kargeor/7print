@@ -27,6 +27,10 @@ ssize_t readX(int fd, void* buf, size_t size) {
     ret = read(fd, buf, size);
   } while ((ret == -1) && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK));
 
+  if ((ret == -1) && (errno == ECONNRESET)) {
+    return 0; // disconnected
+  }
+
   TRY(ret, "readX");
   return ret;
 }

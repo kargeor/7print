@@ -29,7 +29,7 @@ static char *portname = "/dev/ttyACM0";
 static int baudSpeed = B115200;
 static int serialFd = 0;
 
-static void openSerial(void) {
+static int openSerial(void) {
   if (args.serialPortOverride) {
     portname = args.serialPort;
     // TODO: read from config
@@ -39,7 +39,7 @@ static void openSerial(void) {
 
   if (args.dontSetSerialConfig) {
     printf_w("Dont-Set-Serial-Config is set\n");
-    return;
+    return 1;
   }
 
   struct termios tty;
@@ -74,6 +74,7 @@ static void openSerial(void) {
   // Wait for printer to be ready
   // TODO: Find better way
   sleep(1);
+  return 1;
 }
 
 static void setHighPriority(void) {
@@ -92,16 +93,33 @@ static void sendState(int pipeWrite) {
 
 void serialService(int pipeRead, int pipeWrite) {
   setHighPriority();
-  openSerial();
-  serverState.state = 0;
+
+  //
+  serverState.bed.target = 0;
+  serverState.bed.current = 0;
+  serverState.extr.target = 0;
+  serverState.extr.current = 0;
+
+  serverState.currentFile[0] = '\0';
+  serverState.bytesSent = 0;
+  serverState.bytesRemain = 0;
+  serverState.zposSent = 0;
+  serverState.zposRemain = 0;
+  serverState.timeSpent = 0;
+  serverState.timeRemain = 1000;
+  //
+
+  if (openSerial()) {
+    serverState.state = SERVER_READY;
+  } else {
+    serverState.state = SERVER_NO_CON;
+  }
 
   while (1) {
+    serverState.timeSpent++;
     sendState(pipeWrite);
-    serverState.state++;
-
-    writeX(serialFd, "M117 TEST\n", 10);
-
-    sleep(2);
+    // writeX(serialFd, "M117 TEST\n", 10);
+    sleep(1);
   }
 }
 

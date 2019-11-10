@@ -34,11 +34,12 @@ typedef struct {
 } TEMPERATURE; // 4 bytes
 
 typedef enum {
-  SERVER_IDLE     = 1, // no serial connection
+  SERVER_NO_CON   = 1, // no serial connection
   SERVER_READY    = 2, // ready for command
-  SERVER_BUSY     = 3,
-  SERVER_PRINTING = 4,
-  SERVER_ERROR    = 5
+  SERVER_BUSY     = 3, // busy (not printing from file)
+  SERVER_PRINTING = 4, // printing from file
+  SERVER_PAUSED   = 5, // printing from file: paused
+  SERVER_ERROR    = 6
 } SERVER_STATE_ENUM;
 
 typedef struct {
@@ -50,13 +51,17 @@ typedef struct {
   TEMPERATURE bed;     // 12
   TEMPERATURE extr;    // 16
 
+  // When printing from file
   FILENAME currentFile; // 80
   uint32_t bytesSent;   // 84
-  uint32_t bytesLeft;   // 88
+  uint32_t bytesRemain; // 88
   uint32_t zposSent;    // 92 [x100 mm]
-  uint32_t zposLeft;    // 96 [x100 mm]
+  uint32_t zposRemain;  // 96 [x100 mm]
+  uint32_t timeSpent;   // 100 [seconds]
+  uint32_t timeRemain;  // 104 [seconds]
+  // END: When printing from file
 
-  uint32_t state;       // 100
+  uint32_t state;       // 108
 } SERVER_STATE;
 
 
@@ -84,10 +89,10 @@ typedef struct {
 } COMMAND;
 
 
-static_assert(sizeof(SERVER_STATE) == 100, "SERVER_STATE size");
+static_assert(sizeof(SERVER_STATE) == 108, "SERVER_STATE size");
 static_assert(sizeof(COMMAND) == 140, "COMMAND size");
 
-#define TRY(CMD, ERR) { if((CMD) == -1) { perror(ERR); exit(1); } }
+#define TRY(CMD, ERR) { if((CMD) == -1) { printf("[ERROR %d]\n", errno); perror(ERR); exit(1); } }
 
 
 ssize_t writeX(int fd, const void* buf, size_t size);
