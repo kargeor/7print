@@ -3,6 +3,22 @@
   import ValueDisplay from './ValueDisplay.svelte';
   import Button from './Button.svelte';
   import UploadedFile from './UploadedFile.svelte';
+
+  let serverFiles = [];
+  fetch('api-7print/listFiles').then(r => r.json()).then(json => (serverFiles = json));
+  // TODO: sort serverFiles by time
+
+  const ws = new WebSocket('ws://7print.local:7777/socket', 'binary');
+  ws.binaryType = 'arraybuffer';
+  const messageSize = 100;
+  ws.onmessage = ({data}) => {
+    if (data.byteLength !== messageSize) {
+      console.error('Data size is wrong');
+    } else {
+      const v = new DataView(data);
+      console.log(v.getUint32(96, true));
+    }
+  };
 </script>
 
 <style>
@@ -41,9 +57,9 @@
 
 <section>
   <h1>Files</h1>
-  <UploadedFile />
-  <UploadedFile />
-  <UploadedFile />
-  <UploadedFile />
+{#each serverFiles as { name, stat }, i}
+  <UploadedFile {name} {stat} />
+{/each}
+
   <Button title="Upload" />
 </section>

@@ -93,6 +93,7 @@ static void sendState(int pipeWrite) {
 void serialService(int pipeRead, int pipeWrite) {
   setHighPriority();
   openSerial();
+  serverState.state = 0;
 
   while (1) {
     sendState(pipeWrite);
