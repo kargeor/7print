@@ -124,5 +124,6 @@ extern CMD_ARGS args;
 #define printf_d(format, ...) { printf("DEBUG: " format, ##__VA_ARGS__); }
 #define printf_w(format, ...) { printf("WARN: " format, ##__VA_ARGS__); }
 
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 #endif

@@ -1,27 +1,10 @@
 #include "common.h"
 
-
 /*
-  B0
-  B50
-  B75
-  B110
-  B134
-  B150
-  B200
-  B300
-  B600
-  B1200
-  B1800
-  B2400
-  B4800
-  B9600
-  B19200
-  B38400
-  B57600
-  B115200
-  B230400
-  // https://code.woboq.org/userspace/glibc/bits/termios.h.html
+  https://code.woboq.org/userspace/glibc/bits/termios.h.html
+
+  B0 B50 B75 B110 B134 B150 B200 B300 B600 B1200 B1800 B2400 B4800
+  B9600 B19200 B38400 B57600 B115200 B230400
 */
 
 // TODO: Read portname+baudSpeed from config file
@@ -35,7 +18,11 @@ static int openSerial(void) {
     // TODO: read from config
   }
 
-  TRY(serialFd = open(portname, O_RDWR | O_NOCTTY | O_SYNC), "serial open");
+  serialFd = open(portname, O_RDWR | O_NOCTTY | O_SYNC);
+
+  if (serialFd == -1) {
+    return 0; // Failed
+  }
 
   if (args.dontSetSerialConfig) {
     printf_w("Dont-Set-Serial-Config is set\n");
@@ -44,10 +31,18 @@ static int openSerial(void) {
 
   struct termios tty;
   memset(&tty, 0, sizeof(tty));
-  TRY(tcgetattr(serialFd, &tty), "tcgetattr");
 
-  TRY(cfsetospeed(&tty, baudSpeed), "cfsetospeed");
-  TRY(cfsetispeed(&tty, baudSpeed), "cfsetispeed");
+  if (tcgetattr(serialFd, &tty) == -1) {
+    printf_w("tcgetattr failed\n");
+  }
+
+  if (cfsetospeed(&tty, baudSpeed) == -1) {
+    printf_w("cfsetospeed failed\n");
+  }
+
+  if (cfsetispeed(&tty, baudSpeed) == -1) {
+    printf_w("cfsetispeed failed\n");
+  }
 
   // 8-bit
   tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;
@@ -69,7 +64,9 @@ static int openSerial(void) {
   // no flow control
   tty.c_cflag &= ~CRTSCTS;
 
-  TRY(tcsetattr(serialFd, TCSANOW, &tty), "tcsetattr");
+  if (tcsetattr(serialFd, TCSANOW, &tty) == -1) {
+    printf_w("tcsetattr failed\n");
+  }
 
   // Wait for printer to be ready
   // TODO: Find better way
@@ -91,38 +88,6 @@ static void sendState(int pipeWrite) {
   writeX(pipeWrite, &serverState, sizeof(SERVER_STATE));
 }
 
-void serialService(int pipeRead, int pipeWrite) {
-  setHighPriority();
-
-  //
-  serverState.bed.target = 0;
-  serverState.bed.current = 0;
-  serverState.extr.target = 0;
-  serverState.extr.current = 0;
-
-  serverState.currentFile[0] = '\0';
-  serverState.bytesSent = 0;
-  serverState.bytesRemain = 0;
-  serverState.zposSent = 0;
-  serverState.zposRemain = 0;
-  serverState.timeSpent = 0;
-  serverState.timeRemain = 1000;
-  //
-
-  if (openSerial()) {
-    serverState.state = SERVER_READY;
-  } else {
-    serverState.state = SERVER_NO_CON;
-  }
-
-  while (1) {
-    serverState.timeSpent++;
-    sendState(pipeWrite);
-    // writeX(serialFd, "M117 TEST\n", 10);
-    sleep(1);
-  }
-}
-
 // gCode Handling
 
 #define G_CODE_BUF_SIZE 1024
@@ -138,6 +103,8 @@ static int responseBufferPos = 0;
 static int maxQueueCommands = 4;
 static int currentQueueCommands = 0;
 static int waitQueueEmpty = 0;
+
+static FILE *fileBeingPrinted = NULL;
 
 // return true if we should wait and not add more commands
 static int isWaitCommand(void) {
@@ -169,7 +136,11 @@ static int trimGCodeLine(void) {
 
 // return true if we have next command
 static int readNextGCodeLine(void) {
-  if (fgets(gCodeLine, G_CODE_BUF_SIZE, args.gcodeDebugFile) == NULL) {
+  if (!fileBeingPrinted) {
+    return 0;
+  }
+
+  if (fgets(gCodeLine, G_CODE_BUF_SIZE, fileBeingPrinted) == NULL) {
     // EOF
     return 0;
   }
@@ -214,35 +185,41 @@ static int processResponseBuffer(void) {
   return 0;
 }
 
+static void sendLineToSerialIfNeeded(void) {
+  int lineSize = 0;
+  waitQueueEmpty = waitQueueEmpty && (currentQueueCommands > 0);
+
+  if (!waitQueueEmpty
+      && (currentQueueCommands < maxQueueCommands)
+      && readNextGCodeLine()
+      && (lineSize = trimGCodeLine())) {
+
+    gCodeLine[lineSize] = '\n';
+    writeX(serialFd, gCodeLine, lineSize + 1);
+    currentQueueCommands++;
+
+    gCodeLine[lineSize] = '\0';
+    printf_d("G-Code = [%s] Queue = %d/%d\n", gCodeLine, currentQueueCommands, maxQueueCommands);
+
+    if (isWaitCommand()) {
+      printf_d("Wait for Queue to clear\n");
+      waitQueueEmpty = 1;
+    }
+  }
+}
+
 void serialTestSendGcode(void) {
   struct timeval timeout = {0, 1000};
+
   openSerial();
+  fileBeingPrinted = args.gcodeDebugFile;
 
   fd_set readfds;
   FD_ZERO(&readfds);
 
   while(1) {
 
-    int lineSize = 0;
-    waitQueueEmpty = waitQueueEmpty && (currentQueueCommands > 0);
-
-    if (!waitQueueEmpty
-        && (currentQueueCommands < maxQueueCommands)
-        && readNextGCodeLine()
-        && (lineSize = trimGCodeLine())) {
-
-      gCodeLine[lineSize] = '\n';
-      writeX(serialFd, gCodeLine, lineSize + 1);
-      currentQueueCommands++;
-
-      gCodeLine[lineSize] = '\0';
-      printf_d("G-Code = [%s] Queue = %d/%d\n", gCodeLine, currentQueueCommands, maxQueueCommands);
-
-      if (isWaitCommand()) {
-        printf_d("Wait for Queue to clear\n");
-        waitQueueEmpty = 1;
-      }
-    }
+    sendLineToSerialIfNeeded();
 
     // serial read response line
     FD_SET(serialFd, &readfds);
@@ -253,4 +230,67 @@ void serialTestSendGcode(void) {
       while(processResponseBuffer());
     }
   }
+}
+
+// END gCode Handling
+
+static void serialServiceMainLoop(int pipeRead, int pipeWrite) {
+  struct timeval timeout = {0, 1000};
+
+  fd_set readfds;
+  FD_ZERO(&readfds);
+
+  while (1) {
+    sendLineToSerialIfNeeded();
+
+    // read from serial and/or pipe
+    FD_SET(serialFd, &readfds);
+    FD_SET(pipeRead, &readfds);
+    select(MAX(serialFd, pipeRead) + 1, &readfds, NULL, NULL, &timeout);
+
+    if (FD_ISSET(serialFd, &readfds)) {
+      responseBufferPos += readX(serialFd, &(responseBuffer[responseBufferPos]), G_CODE_BUF_SIZE - responseBufferPos);
+      while(processResponseBuffer());
+    }
+
+    if (FD_ISSET(pipeRead, &readfds)) {
+      // incoming command
+      printf_d("New incoming command\n");
+    }
+  }
+}
+
+void serialService(int pipeRead, int pipeWrite) {
+  setHighPriority();
+
+  //
+  serverState.bed.target = 0;
+  serverState.bed.current = 0;
+  serverState.extr.target = 0;
+  serverState.extr.current = 0;
+
+  serverState.currentFile[0] = '\0';
+  serverState.bytesSent = 0;
+  serverState.bytesRemain = 0;
+  serverState.zposSent = 0;
+  serverState.zposRemain = 0;
+  serverState.timeSpent = 0;
+  serverState.timeRemain = 1000;
+  //
+
+  if (openSerial()) {
+    serverState.state = SERVER_READY;
+  } else {
+    serverState.state = SERVER_NO_CON;
+  }
+
+  sendState(pipeWrite);
+
+  // while (1) {
+  //   serverState.timeSpent++;
+  //   sendState(pipeWrite);
+  //   writeX(serialFd, "M117 TEST\n", 10);
+  //   sleep(1);
+  // }
+  serialServiceMainLoop(pipeRead, pipeWrite);
 }
