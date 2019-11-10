@@ -1,10 +1,10 @@
-#!/usr/bin/env bash
+#!/usr/bin/env python
 
-cat <<EOF
+print """\
 {
   "api": "1.0",
   "server": "1.0.0",
   "text": "OctoPrint-api-compatible 7Print"
 }
-EOF
+"""
 

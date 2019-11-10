@@ -1,12 +1,24 @@
-#!/usr/bin/env bash
+#!/usr/bin/env python
 
-if [ "$REQUEST_METHOD" = "POST" ]; then
-  if [ "$CONTENT_LENGTH" -gt 0 ]; then
-    FN=`echo "$PATH_INFO" | sed 's/^\///' | sed 's/[^A-Za-z0-9\.]/_/g'`
-    echo "$PATH_INFO" >/home/pi/uploads/pi.txt
-    cat | sed '1,/Content-Type:/d' | tail -c +3 | head --lines=-1 | head --bytes=-4 >"/home/pi/uploads/$FN"
-  fi
-fi
+import cgi, re
+#import cgitb
+#cgitb.enable()
 
-echo "OK"
+form = cgi.FieldStorage()
+
+if 'file' in form:
+  fileitem = form['file']
+  if fileitem.filename:
+    fn = re.sub('[^A-Za-z0-9\.]', '_', fileitem.filename)
+    open('/home/pi/uploads/' + fn, 'wb').write(fileitem.file.read())
+
+
+print """\
+Content-Type: text/html\n
+<html>
+<body>
+OK
+</body>
+</html>
+"""
 
