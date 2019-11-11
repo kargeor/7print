@@ -8,9 +8,9 @@ static uint32_t cmdBufferPos[MAX_CLIENTS];
 
 static uint8_t validateCommand(COMMAND *c) {
   if (c->magic[0] != '7') return 0;
-  if (c->magic[0] != 'P') return 0;
-  if (c->magic[0] != 'R') return 0;
-  if (c->magic[0] != 'N') return 0;
+  if (c->magic[1] != 'P') return 0;
+  if (c->magic[2] != 'R') return 0;
+  if (c->magic[3] != 'N') return 0;
   if (c->version != PROTO_VERSION) return 0;
 
   return 1;
@@ -63,12 +63,12 @@ void tcpService(int pipeRead, int pipeWrite) {
 
     activity = select(max_sd + 1, &readfds, NULL, NULL, NULL);
 
-    if ((activity < 0) && (errno != EINTR)) printf("select error");
+    if ((activity < 0) && (errno != EINTR)) printf_w("select error");
 
     if (FD_ISSET(listenSocket, &readfds)) {
       TRY(newSocket = accept(listenSocket, (struct sockaddr *)&address, (socklen_t*)&addrlen), "accept");
 
-      printf("New [%d] %s:%d\n", newSocket, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
+      printf_d("New [%d] %s:%d\n", newSocket, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 
       writeX(newSocket, &serverState, sizeof(SERVER_STATE));
 
@@ -89,18 +89,19 @@ void tcpService(int pipeRead, int pipeWrite) {
         uint8_t res = readToBuffer(sd, cmdBuffer[i], &(cmdBufferPos[i]), sizeof(COMMAND));
         if (res == 1) {
           // disconnect
-          printf("Disconnected [%d]\n", sd);
+          printf_d("Disconnected [%d]\n", sd);
           close(sd);
           clientSocket[i] = 0;
         } else if (res == 2) {
           // client sent command
-          printf("Command from [%d]\n", sd);
+          printf_d("Command from [%d]\n", sd);
           if (validateCommand((COMMAND*)cmdBuffer[i])) {
             // write to pipe
             writeX(pipeWrite, cmdBuffer[i], sizeof(COMMAND));
-            printf("Command Sent\n");
+            printf_d("Command Sent\n");
           } else {
             // handle invalid
+            printf_w("Invalid command ignored\n");
           }
         }
       }

@@ -66,10 +66,10 @@ typedef struct {
 
 
 typedef enum {
-  CMD_PRINT_FILE   = 1,
-  CMD_RUN_GCODE    = 2,
-  CMD_PAUSE_PRINT  = 3,
-  CMD_CANCEL_PRINT = 4
+  CMD_PRINT_FILE   = 1, // print file in s.filename[0]
+  CMD_RUN_GCODE    = 2, // run g-code in s.gCode
+  CMD_PAUSE_PRINT  = 3, // pause current print
+  CMD_CANCEL_PRINT = 4  // cancel current print
 } COMMAND_ENUM;
 
 typedef union {

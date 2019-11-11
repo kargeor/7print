@@ -1,5 +1,8 @@
 #include "common.h"
 
+static uint8_t cmdSrvBuffer[sizeof(COMMAND)];
+static uint32_t cmdSrvBufferPos = 0;
+
 /*
   https://code.woboq.org/userspace/glibc/bits/termios.h.html
 
@@ -234,6 +237,10 @@ void serialTestSendGcode(void) {
 
 // END gCode Handling
 
+static void handleCommand(void) {
+  serverState.timeSpent++;
+}
+
 static void serialServiceMainLoop(int pipeRead, int pipeWrite) {
   struct timeval timeout = {0, 1000};
 
@@ -255,7 +262,13 @@ static void serialServiceMainLoop(int pipeRead, int pipeWrite) {
 
     if (FD_ISSET(pipeRead, &readfds)) {
       // incoming command
-      printf_d("New incoming command\n");
+      uint8_t res = readToBuffer(pipeRead, cmdSrvBuffer, &cmdSrvBufferPos, sizeof(COMMAND));
+      if (res == 2) {
+        memcpy(&cmd, cmdSrvBuffer, sizeof(COMMAND));
+        printf_d("New incoming command: %d\n", cmd.commandId);
+        handleCommand();
+        sendState(pipeWrite);
+      }
     }
   }
 }

@@ -117,5 +117,5 @@
   <UploadedFile {name} {stat} />
 {/each}
 
-  <Button title="Upload" />
+  <Button title="Upload" on:click="{() => ws.send('7PRN\x01\x00XX\x01\x00\x00\x00openjscad_1_0.2mm_PLA_MK3S_19m.gcode\x001234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901')}" />
 </section>

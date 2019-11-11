@@ -9,4 +9,4 @@
   }
 </style>
 
-<button>{title}</button>
+<button on:click>{title}</button>
