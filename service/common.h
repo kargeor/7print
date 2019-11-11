@@ -26,7 +26,7 @@
 #define MAX_CLIENTS 20
 
 
-typedef uint8_t FILENAME[64];
+typedef char FILENAME[64];
 
 typedef struct {
   uint16_t target;  // x10 deg C

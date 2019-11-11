@@ -54,6 +54,7 @@
         console.log("Cannot decode " + f);
       }
     });
+    // console.log({decodedMessage: result});
     return result;
   }
   //
@@ -85,9 +86,8 @@
   }
   @media (min-aspect-ratio: 8/7) {
     section {
-      width: 46%;
-      float: left;
-      margin: 0% 2%;
+      width: 400px;
+      margin: auto;
     }
   }
 </style>
@@ -95,20 +95,22 @@
 <section>
   <h1>7print (alpha version)</h1>
   <ValueDisplay name="Status" value={u(SERVER_STATES[serverState['state']])} />
+{#if serverState['state'] === 4}
   <ValueDisplay name="Progress" value={calcPercent(serverState)} />
   <ValueDisplay name="Print Time" value={formatTime(serverState['timeSpent'])} />
   <ValueDisplay name="Remaining Time" value={formatTime(serverState['timeRemain'])} />
-  <ValueDisplay name="Z Position" value="12.30mm" />
+  <ValueDisplay name="Z Position" value={`${u(serverState['zposSent'] / 100)}mm`} />
+{/if}
 
-  <TempDisplay name="Hotend" valueCurrent=20 valueSet=200 />
-  <TempDisplay name="Bed" valueCurrent=20 valueSet=60 />
+  <TempDisplay name="Hotend" valueCurrent={u(serverState['extrCurrent'])} valueSet={u(serverState['extrTarget'])} />
+  <TempDisplay name="Bed" valueCurrent={u(serverState['bedCurrent'])} valueSet={u(serverState['bedTarget'])} />
 
-  <Button title="Temp Graph" />
+  <Button title="Temp Graph" on:click={() => alert('Not implemented yet')} />
   <Button title="Stop Print" />
 
   <h1>Control</h1>
-  <Button title="Change Temp" />
-  <Button title="Move" />
+  <Button title="Change Temp" on:click={() => alert('Not implemented yet')} />
+  <Button title="Move" on:click={() => alert('Not implemented yet')} />
 </section>
 
 <section>
@@ -117,5 +119,5 @@
   <UploadedFile {name} {stat} />
 {/each}
 
-  <Button title="Upload" on:click="{() => ws.send('7PRN\x01\x00XX\x01\x00\x00\x00openjscad_1_0.2mm_PLA_MK3S_19m.gcode\x001234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901')}" />
+  <Button title="Upload" on:click={() => ws.send('7PRN\x01\x00XX\x01\x00\x00\x00openjscad_1_0.2mm_PLA_MK3S_19m.gcode\x001234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901')} />
 </section>

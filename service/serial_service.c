@@ -87,10 +87,6 @@ static void setHighPriority(void) {
   /// https://unix.stackexchange.com/questions/44334/is-there-any-use-for-rlimit-nice
 }
 
-static void sendState(int pipeWrite) {
-  writeX(pipeWrite, &serverState, sizeof(SERVER_STATE));
-}
-
 // gCode Handling
 
 #define G_CODE_BUF_SIZE 1024
@@ -108,6 +104,7 @@ static int currentQueueCommands = 0;
 static int waitQueueEmpty = 0;
 
 static FILE *fileBeingPrinted = NULL;
+static time_t print_start_t;
 
 // return true if we should wait and not add more commands
 static int isWaitCommand(void) {
@@ -237,8 +234,48 @@ void serialTestSendGcode(void) {
 
 // END gCode Handling
 
+static void sendState(int pipeWrite) {
+  if (serverState.state == SERVER_PRINTING) {
+    time_t now_t;
+    time(&now_t);
+    serverState.timeSpent = difftime(now_t, print_start_t);
+  }
+  writeX(pipeWrite, &serverState, sizeof(SERVER_STATE));
+}
+
 static void handleCommand(void) {
-  serverState.timeSpent++;
+  switch (cmd.commandId) {
+    case CMD_PRINT_FILE:
+      if (fileBeingPrinted == NULL && serverState.state == SERVER_READY) {
+        char fn[256] = "/Users/kargeor/Documents/3d-printing/";
+        strcat(fn, cmd.s.filename[0]);
+        fileBeingPrinted = fopen(fn, "r");
+        if (fileBeingPrinted != NULL) {
+          printf_d("Print started\n");
+          strcpy(serverState.currentFile, cmd.s.filename[0]);
+          serverState.state = SERVER_PRINTING;
+          time(&print_start_t);
+        } else {
+          printf_w("Cannot start new print: File not found\n");
+        }
+      } else {
+        printf_w("Cannot start new print: Busy\n");
+      }
+      break;
+
+    case CMD_RUN_GCODE:
+      break;
+
+    case CMD_PAUSE_PRINT:
+      break;
+
+    case CMD_CANCEL_PRINT:
+      break;
+
+    default:
+      printf_w("Bad command id\n");
+      break;
+  }
 }
 
 static void serialServiceMainLoop(int pipeRead, int pipeWrite) {

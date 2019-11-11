@@ -33,7 +33,7 @@ export function formatTime(t, undefinedValue = '') {
 }
 
 export function u(v) {
-  if (v === undefined || v === null) return '';
+  if (v === undefined || v === null || Number.isNaN(v)) return '';
   return v;
 }
 
