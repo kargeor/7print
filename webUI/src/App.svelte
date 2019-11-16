@@ -10,7 +10,7 @@
   // TODO: sort serverFiles by time
 
   let serverState = {};
-  const ws = new WebSocket(`ws://${location.host}/socket`, 'binary');
+  const ws = new WebSocket(`${location.protocol.replace('http', 'ws')}//${location.host}/socket`, 'binary');
   ws.binaryType = 'arraybuffer';
   //
   const messageSize = 108;
@@ -118,6 +118,9 @@
 {#each serverFiles as { name, stat }, i}
   <UploadedFile {name} {stat} />
 {/each}
+{#if serverFiles.length === 0}
+  Loading...
+{/if}
 
   <Button title="Upload" on:click={() => ws.send('7PRN\x01\x00XX\x01\x00\x00\x00openjscad_1_0.2mm_PLA_MK3S_19m.gcode\x001234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901')} />
 </section>
