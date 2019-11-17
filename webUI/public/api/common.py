@@ -39,7 +39,9 @@ def getCookieVal(name):
 
 def requireAuth():
   # Accept API key header or cookie
-  # Use "shasum --algorithm 256" to generate
+  # Use:
+  # echo -n "The quick brown fox jumps over the lazy dog" | shasum -a 256
+  # to generate
   apiKey = readConfig('api_key')
   if getCookieVal('api_key') == apiKey:
     return

@@ -2,11 +2,17 @@
   import TempDisplay from './TempDisplay.svelte';
   import ValueDisplay from './ValueDisplay.svelte';
   import Button from './Button.svelte';
+  import Login from './Login.svelte';
   import UploadedFile from './UploadedFile.svelte';
   import {formatTime, calcPercent, u} from './utils';
 
   let serverFiles = [];
-  fetch('api/listFiles').then(r => r.json()).then(json => (serverFiles = json));
+  let loginNeeded = false;
+  fetch('api/listFiles')
+    .then(r => r.json())
+    .then(json => (serverFiles = json))
+    .catch(e => (loginNeeded = true));
+  // TODO: catch error cases where login is not needed
   // TODO: sort serverFiles by time
 
   let serverState = {};
@@ -94,6 +100,9 @@
 
 <section>
   <h1>7print (alpha version)</h1>
+{#if loginNeeded}
+  <Login />
+{/if}
   <ValueDisplay name="Status" value={u(SERVER_STATES[serverState['state']])} />
 {#if serverState['state'] === 4}
   <ValueDisplay name="Progress" value={calcPercent(serverState)} />
