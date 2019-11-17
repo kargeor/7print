@@ -6,7 +6,7 @@
   import {formatTime, calcPercent, u} from './utils';
 
   let serverFiles = [];
-  fetch('api-7print/listFiles').then(r => r.json()).then(json => (serverFiles = json));
+  fetch('api/listFiles').then(r => r.json()).then(json => (serverFiles = json));
   // TODO: sort serverFiles by time
 
   let serverState = {};
