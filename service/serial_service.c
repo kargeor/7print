@@ -247,8 +247,9 @@ static void handleCommand(void) {
   switch (cmd.commandId) {
     case CMD_PRINT_FILE:
       if (fileBeingPrinted == NULL && serverState.state == SERVER_READY) {
-        char fn[256] = "/Users/kargeor/Documents/3d-printing/";
+        char fn[256] = "../uploads/";
         strcat(fn, cmd.s.filename[0]);
+        // TODO: Security check filename!
         fileBeingPrinted = fopen(fn, "r");
         if (fileBeingPrinted != NULL) {
           printf_d("Print started\n");
@@ -325,7 +326,7 @@ void serialService(int pipeRead, int pipeWrite) {
   serverState.zposSent = 0;
   serverState.zposRemain = 0;
   serverState.timeSpent = 0;
-  serverState.timeRemain = 1000;
+  serverState.timeRemain = 0;
   //
 
   if (openSerial()) {

@@ -5,6 +5,7 @@
   import Login from './Login.svelte';
   import UploadedFile from './UploadedFile.svelte';
   import {formatTime, calcPercent, u} from './utils';
+  import {encodeMessage, decodeMessage} from './messages';
 
   let serverFiles = [];
   let loginNeeded = false;
@@ -17,6 +18,7 @@
 
   let serverState = {};
   let ws = null;
+  const messageSize = 108;
   const apiKeyRe = /api_key=([0-9a-z]+)/.exec(document.cookie);
   if (apiKeyRe && apiKeyRe[1]) {
     ws = new WebSocket(`${location.protocol.replace('http', 'ws')}//${location.host}/socket`, 'binary');
@@ -34,52 +36,7 @@
     ws.onopen = () => {
       ws.send(apiKeyRe[1]);
     };
-  }
-  //
-  const messageSize = 108;
-  const FIELDS = [
-    ['magic0',       8],
-    ['magic1',       8],
-    ['magic2',       8],
-    ['magic3',       8],
-    ['version',     16],
-    ['reserved',    16],
-    ['bedTarget',   16],
-    ['bedCurrent',  16],
-    ['extrTarget',  16],
-    ['extrCurrent', 16],
-    ['currentFile', 's', 64],
-    ['bytesSent',   32],
-    ['bytesRemain', 32],
-    ['zposSent',    32],
-    ['zposRemain',  32],
-    ['timeSpent',   32],
-    ['timeRemain',  32],
-    ['state',       32],
-  ];
-  function decodeMessage(dv) {
-    const result = {};
-    let offset = 0;
-    FIELDS.forEach(f => {
-      if (f[1] === 8) {
-        result[f[0]] = dv.getUint8(offset, true);
-        offset += 1;
-      } else if (f[1] === 16) {
-        result[f[0]] = dv.getUint16(offset, true);
-        offset += 2;
-      } else if (f[1] === 32) {
-        result[f[0]] = dv.getUint32(offset, true);
-        offset += 4;
-      } else if (f[1] === 's') {
-        // TODO
-        offset += f[2];
-      } else {
-        console.log("Cannot decode " + f);
-      }
-    });
-    // console.log({decodedMessage: result});
-    return result;
-  }
+  }  
   //
   const SERVER_STATES = [
     '',
@@ -90,6 +47,16 @@
     'PAUSED',
     'ERROR',
   ];
+  function sendCommand(params) {
+    ws.send(encodeMessage(Object.assign({
+      magic0: 55, // 7
+      magic1: 80, // P
+      magic2: 82, // R
+      magic3: 78, // N
+      version: 1,
+      reserved: 0,
+    }, params)));
+  }
 </script>
 
 <style>
@@ -123,7 +90,7 @@
   <TempDisplay name="Bed" valueCurrent={u(serverState['bedCurrent'])} valueSet={u(serverState['bedTarget'])} />
 
   <Button title="Temp Graph" on:click={() => alert('Not implemented yet')} />
-  <Button title="Stop Print" />
+  <Button title="Stop Print" on:click={() => alert('Not implemented yet')} />
 
   <h1>Control</h1>
   <Button title="Change Temp" on:click={() => alert('Not implemented yet')} />
@@ -133,11 +100,11 @@
 <section>
   <h1>Files</h1>
 {#each serverFiles as { name, stat }, i}
-  <UploadedFile {name} {stat} />
+  <UploadedFile {name} {stat} on:print={e => sendCommand({commandId: 1, file0: e.detail.name})} />
 {/each}
 {#if serverFiles.length === 0}
   Loading...
 {/if}
 
-  <Button title="Upload" on:click={() => ws.send('7PRN\x01\x00XX\x01\x00\x00\x00openjscad_1_0.2mm_PLA_MK3S_19m.gcode\x001234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901')} />
+  <Button title="Upload" on:click={() => sendCommand({commandId: 1, file0: 'Knob_0.2mm_PLA_MK3S_1h22m.gcode'})} />
 </section>

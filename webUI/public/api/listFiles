@@ -10,7 +10,7 @@ def stat2obj(stat):
   return {k: getattr(stat, k) for k in dir(stat) if k in KEEP}
 
 p = getUploadDir()
-l = os.listdir(p)
+l = filter(lambda n: not n.startswith('.'), os.listdir(p))
 l = map(lambda n: {'name': n, 'stat': stat2obj(os.stat(p + '/' + n))}, l)
 
 print """\
