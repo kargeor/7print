@@ -118,7 +118,14 @@ typedef struct {
   char *serialPort;
 } CMD_ARGS;
 
+typedef struct {
+  uint8_t apiKey[64];
+  uint8_t serialPort[128];
+  uint8_t serialBaud[32];
+} USER_CONFIG;
+
 extern CMD_ARGS args;
+extern USER_CONFIG config;
 
 
 #define printf_d(format, ...) { printf("DEBUG: " format, ##__VA_ARGS__); }

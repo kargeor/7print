@@ -11,7 +11,7 @@ if 'pass' in form:
   if sha256(form['pass'].value).hexdigest() == readConfig('user_password'):
     print """\
 Content-Type: text/plain
-Set-Cookie:api_key=%s\n
+Set-Cookie: api_key=%s; Secure; Path=/; Max-Age=2592000;\n
 OK
 """ % (readConfig('api_key'))
     sys.exit(0)

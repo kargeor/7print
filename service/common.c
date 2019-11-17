@@ -3,6 +3,7 @@
 SERVER_STATE serverState;
 COMMAND cmd;
 CMD_ARGS args;
+USER_CONFIG config;
 
 ssize_t writeX(int fd, const void* buf, size_t size) {
   ssize_t ret;

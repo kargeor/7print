@@ -3,10 +3,37 @@
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 
+static void readConfigFile(char *fileName, void *target, size_t sz, int addNullToEnd) {
+  printf_d("Reading {%s} Max=[%zu]\n", fileName, sz);
+
+  if (addNullToEnd) {
+    sz = sz - 1;
+  }
+
+  int fd;
+  TRY(fd = open(fileName, O_RDONLY), "open config");
+  ssize_t r = readX(fd, target, sz);
+  close(fd);
+
+  if (addNullToEnd) {
+    ((char*)target)[r] = '\0';
+  }
+
+  printf_d("Read %zd bytes\n", r);
+}
+
+static void readConfig(void) {
+  readConfigFile("../config/api_key", config.apiKey, sizeof(config.apiKey), 0);
+  readConfigFile("../config/serial_port_name", config.serialPort, sizeof(config.serialPort), 1);
+  readConfigFile("../config/serial_port_baud", config.serialBaud, sizeof(config.serialBaud), 1);
+}
+
 int main(int argc, char *argv[]) {
   pid_t tcp, serial;
   int serial_to_tcp[2];
   int tcp_to_serial[2];
+
+  readConfig();
 
   int c;
   memset(&args, 0, sizeof(CMD_ARGS));

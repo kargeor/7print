@@ -16,8 +16,25 @@
   // TODO: sort serverFiles by time
 
   let serverState = {};
-  const ws = new WebSocket(`${location.protocol.replace('http', 'ws')}//${location.host}/socket`, 'binary');
-  ws.binaryType = 'arraybuffer';
+  let ws = null;
+  const apiKeyRe = /api_key=([0-9a-z]+)/.exec(document.cookie);
+  if (apiKeyRe && apiKeyRe[1]) {
+    ws = new WebSocket(`${location.protocol.replace('http', 'ws')}//${location.host}/socket`, 'binary');
+    ws.binaryType = 'arraybuffer';
+
+    ws.onmessage = ({data}) => {
+      if (data.byteLength !== messageSize) {
+        console.error('Data size is wrong');
+      } else {
+        const dv = new DataView(data);
+        serverState = decodeMessage(dv);
+      }
+    };
+
+    ws.onopen = () => {
+      ws.send(apiKeyRe[1]);
+    };
+  }
   //
   const messageSize = 108;
   const FIELDS = [
@@ -73,15 +90,6 @@
     'PAUSED',
     'ERROR',
   ];
-  //
-  ws.onmessage = ({data}) => {
-    if (data.byteLength !== messageSize) {
-      console.error('Data size is wrong');
-    } else {
-      const dv = new DataView(data);
-      serverState = decodeMessage(dv);
-    }
-  };
 </script>
 
 <style>

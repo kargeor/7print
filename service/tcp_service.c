@@ -6,6 +6,10 @@ static uint32_t serverStateBufferPos = 0;
 static uint8_t cmdBuffer[MAX_CLIENTS][sizeof(COMMAND)];
 static uint32_t cmdBufferPos[MAX_CLIENTS];
 
+static uint8_t apiKeyBuffer[MAX_CLIENTS][sizeof(config.apiKey)];
+static uint32_t apiKeyBufferPos[MAX_CLIENTS];
+static uint32_t apiKeyAccepted[MAX_CLIENTS];
+
 static uint8_t validateCommand(COMMAND *c) {
   if (c->magic[0] != '7') return 0;
   if (c->magic[1] != 'P') return 0;
@@ -70,12 +74,13 @@ void tcpService(int pipeRead, int pipeWrite) {
 
       printf_d("New [%d] %s:%d\n", newSocket, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 
-      writeX(newSocket, &serverState, sizeof(SERVER_STATE));
-
       for (i = 0; i < MAX_CLIENTS; i++) {
         if(clientSocket[i] == 0) {
           clientSocket[i] = newSocket;
           cmdBufferPos[i] = 0;
+          apiKeyBufferPos[i] = 0;
+          apiKeyAccepted[i] = 0;
+          memset(apiKeyBuffer[i], 0, sizeof(config.apiKey));
           break;
         }
       }
@@ -86,25 +91,50 @@ void tcpService(int pipeRead, int pipeWrite) {
       sd = clientSocket[i];
 
       if (FD_ISSET(sd, &readfds)) {
-        uint8_t res = readToBuffer(sd, cmdBuffer[i], &(cmdBufferPos[i]), sizeof(COMMAND));
-        if (res == 1) {
-          // disconnect
-          printf_d("Disconnected [%d]\n", sd);
-          close(sd);
-          clientSocket[i] = 0;
-        } else if (res == 2) {
-          // client sent command
-          printf_d("Command from [%d]\n", sd);
-          if (validateCommand((COMMAND*)cmdBuffer[i])) {
-            // write to pipe
-            writeX(pipeWrite, cmdBuffer[i], sizeof(COMMAND));
-            printf_d("Command Sent\n");
-          } else {
-            // handle invalid
-            printf_w("Invalid command ignored\n");
+        if (apiKeyAccepted[i]) {
+          uint8_t res = readToBuffer(sd, cmdBuffer[i], &(cmdBufferPos[i]), sizeof(COMMAND));
+          if (res == 1) {
+            // disconnect
+            printf_d("Disconnected [%d]\n", sd);
+            close(sd);
+            clientSocket[i] = 0;
+          } else if (res == 2) {
+            // client sent command
+            printf_d("Command from [%d]\n", sd);
+            if (validateCommand((COMMAND*)cmdBuffer[i])) {
+              // write to pipe
+              writeX(pipeWrite, cmdBuffer[i], sizeof(COMMAND));
+              printf_d("Command Sent\n");
+            } else {
+              // handle invalid
+              printf_w("Invalid command ignored\n");
+            }
+          }
+        } else {
+          // read api key
+          uint8_t res = readToBuffer(sd, apiKeyBuffer[i], &(apiKeyBufferPos[i]), sizeof(config.apiKey));
+          if (res == 1) {
+            // disconnect
+            printf_d("Disconnected [%d]\n", sd);
+            close(sd);
+            clientSocket[i] = 0;
+          } else if (res == 2) {
+            if (memcmp(apiKeyBuffer, config.apiKey, sizeof(config.apiKey)) == 0) {
+              // good
+              printf_d("Received API key GOOD [%d]\n", sd);
+              apiKeyAccepted[i] = 1;
+              // Send current status
+              writeX(sd, &serverState, sizeof(SERVER_STATE));
+            } else {
+              // failed
+              printf_w("Received API key BAD [%d]\n", sd);
+              close(sd);
+              clientSocket[i] = 0;
+            }
           }
         }
       }
+
     }
 
     if (FD_ISSET(pipeRead , &readfds)) {
@@ -113,7 +143,7 @@ void tcpService(int pipeRead, int pipeWrite) {
         memcpy(&serverState, serverStateBuffer, sizeof(SERVER_STATE));
         // Send to all clients
         for (i = 0; i < MAX_CLIENTS; i++) {
-          if (clientSocket[i]) {
+          if (clientSocket[i] && apiKeyAccepted[i]) {
             writeX(clientSocket[i], &serverState, sizeof(SERVER_STATE));
           }
         }
