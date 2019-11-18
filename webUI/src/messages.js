@@ -16,6 +16,10 @@ const IN_FIELDS = [
   ['zposRemain',  32],
   ['timeSpent',   32],
   ['timeRemain',  32],
+  ['percentDone',  8],
+  ['reserved1_A',  8],
+  ['reserved1_B',  8],
+  ['reserved1_C',  8],
   ['state',       32],
 ];
 
@@ -30,6 +34,8 @@ const OUT_FIELDS = [
   ['file0', 's',  64],
   ['file1', 's',  64],
 ];
+
+export const inMessageSize = 112;
 
 export function decodeMessage(dv) {
   const result = {};

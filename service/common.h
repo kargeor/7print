@@ -59,9 +59,13 @@ typedef struct {
   uint32_t zposRemain;  // 96 [x100 mm]
   uint32_t timeSpent;   // 100 [seconds]
   uint32_t timeRemain;  // 104 [seconds]
+  uint8_t percentDone;  // 105
+  uint8_t reserved1_A;  // 106
+  uint8_t reserved1_B;  // 107
+  uint8_t reserved1_C;  // 108
   // END: When printing from file
 
-  uint32_t state;       // 108
+  uint32_t state;       // 112
 } SERVER_STATE;
 
 
@@ -89,7 +93,7 @@ typedef struct {
 } COMMAND;
 
 
-static_assert(sizeof(SERVER_STATE) == 108, "SERVER_STATE size");
+static_assert(sizeof(SERVER_STATE) == 112, "SERVER_STATE size");
 static_assert(sizeof(COMMAND) == 140, "COMMAND size");
 
 #define TRY(CMD, ERR) { if((CMD) == -1) { printf("[ERROR %d]\n", errno); perror(ERR); exit(1); } }

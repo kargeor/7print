@@ -37,13 +37,13 @@ export function u(v) {
   return v;
 }
 
-export function calcPercent(s) {
-  if (s['timeSpent'] && s['timeRemain']) {
-    // Both need to be non-zero
-    const t = s['timeSpent'] + s['timeRemain'];
-    const p = Math.round(100 * s['timeSpent'] / t);
-    return `${p}%`;
-  }
+// export function calcPercent(s) {
+//   if (s['timeSpent'] && s['timeRemain']) {
+//     // Both need to be non-zero
+//     const t = s['timeSpent'] + s['timeRemain'];
+//     const p = Math.round(100 * s['timeSpent'] / t);
+//     return `${p}%`;
+//   }
 
-  return '0%';
-}
+//   return '0%';
+// }

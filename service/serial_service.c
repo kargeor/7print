@@ -87,6 +87,9 @@ static void setHighPriority(void) {
   /// https://unix.stackexchange.com/questions/44334/is-there-any-use-for-rlimit-nice
 }
 
+// Fwd decl
+static void sendState(int pipeWrite);
+
 // gCode Handling
 
 #define G_CODE_BUF_SIZE 1024
@@ -148,6 +151,43 @@ static int readNextGCodeLine(void) {
   return 1;
 }
 
+static int readNumFromBuf(char **pos) {
+  int result = 0;
+  char *p = *pos;
+
+  while (*p >= '0' && *p <= '9') {
+    result = result * 10 + (*p - '0');
+    p++;
+  }
+
+  *pos = p;
+  return result;
+}
+
+static int findCharFromBuf(char **pos, char c) {
+  char *p = *pos;
+  while (*p != c && *p != '\0' && *p != '\r' && *p != '\n') p++;
+  *pos = p;
+  return *p == c;
+}
+
+static void processGCodeLine(int pipeWrite) {
+  // Update our stats
+  if (strncmp(gCodeLine, "M73", 3) == 0) {
+    char *pos = gCodeLine;
+
+    if (!findCharFromBuf(&pos, 'P')) return;
+    pos++;
+    serverState.percentDone = readNumFromBuf(&pos);
+
+    if (!findCharFromBuf(&pos, 'R')) return;
+    pos++;
+    serverState.timeRemain = 60 * readNumFromBuf(&pos);
+
+    sendState(pipeWrite);
+  }
+}
+
 static void processResponseLine(void) {
   if (responseLine[0] == 'o' && responseLine[1] == 'k') {
     if (currentQueueCommands > 0) {
@@ -185,7 +225,7 @@ static int processResponseBuffer(void) {
   return 0;
 }
 
-static void sendLineToSerialIfNeeded(void) {
+static void sendLineToSerialIfNeeded(int pipeWrite) {
   int lineSize = 0;
   waitQueueEmpty = waitQueueEmpty && (currentQueueCommands > 0);
 
@@ -195,6 +235,7 @@ static void sendLineToSerialIfNeeded(void) {
       && (lineSize = trimGCodeLine())) {
 
     gCodeLine[lineSize] = '\n';
+    processGCodeLine(pipeWrite);
     writeX(serialFd, gCodeLine, lineSize + 1);
     currentQueueCommands++;
 
@@ -219,7 +260,7 @@ void serialTestSendGcode(void) {
 
   while(1) {
 
-    sendLineToSerialIfNeeded();
+    sendLineToSerialIfNeeded(0);
 
     // serial read response line
     FD_SET(serialFd, &readfds);
@@ -235,6 +276,10 @@ void serialTestSendGcode(void) {
 // END gCode Handling
 
 static void sendState(int pipeWrite) {
+  if (pipeWrite == 0) {
+    // gCode send-mode does not use pipes
+    return;
+  }
   if (serverState.state == SERVER_PRINTING) {
     time_t now_t;
     time(&now_t);
@@ -286,7 +331,7 @@ static void serialServiceMainLoop(int pipeRead, int pipeWrite) {
   FD_ZERO(&readfds);
 
   while (1) {
-    sendLineToSerialIfNeeded();
+    sendLineToSerialIfNeeded(pipeWrite);
 
     // read from serial and/or pipe
     FD_SET(serialFd, &readfds);
@@ -327,6 +372,8 @@ void serialService(int pipeRead, int pipeWrite) {
   serverState.zposRemain = 0;
   serverState.timeSpent = 0;
   serverState.timeRemain = 0;
+
+  serverState.percentDone = 0;
   //
 
   if (openSerial()) {

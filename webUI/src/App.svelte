@@ -4,8 +4,8 @@
   import Button from './Button.svelte';
   import Login from './Login.svelte';
   import UploadedFile from './UploadedFile.svelte';
-  import {formatTime, calcPercent, u} from './utils';
-  import {encodeMessage, decodeMessage} from './messages';
+  import {formatTime, u} from './utils';
+  import {encodeMessage, decodeMessage, inMessageSize} from './messages';
 
   let serverFiles = [];
   let loginNeeded = false;
@@ -18,14 +18,13 @@
 
   let serverState = {};
   let ws = null;
-  const messageSize = 108;
   const apiKeyRe = /api_key=([0-9a-z]+)/.exec(document.cookie);
   if (apiKeyRe && apiKeyRe[1]) {
     ws = new WebSocket(`${location.protocol.replace('http', 'ws')}//${location.host}/socket`, 'binary');
     ws.binaryType = 'arraybuffer';
 
     ws.onmessage = ({data}) => {
-      if (data.byteLength !== messageSize) {
+      if (data.byteLength !== inMessageSize) {
         console.error('Data size is wrong');
       } else {
         const dv = new DataView(data);
@@ -80,7 +79,7 @@
 {/if}
   <ValueDisplay name="Status" value={u(SERVER_STATES[serverState['state']])} />
 {#if serverState['state'] === 4}
-  <ValueDisplay name="Progress" value={calcPercent(serverState)} />
+  <ValueDisplay name="Progress" value={`${u(serverState['percentDone'])}%`} />
   <ValueDisplay name="Print Time" value={formatTime(serverState['timeSpent'])} />
   <ValueDisplay name="Remaining Time" value={formatTime(serverState['timeRemain'])} />
   <ValueDisplay name="Z Position" value={`${u(serverState['zposSent'] / 100)}mm`} />
